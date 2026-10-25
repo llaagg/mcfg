@@ -1,0 +1,23 @@
+#!/bin/sh
+# Actions for the media-player role when it is vlc: desktop-app media-player ACTION
+# Usage: vlc-wrapper ACTION [ARG ...]
+set -eu
+
+action=${1:-}
+[ -n "$action" ] || {
+    echo "Usage: vlc-wrapper {play|open} [ARG ...]" >&2
+    exit 2
+}
+shift
+case "$action" in
+    --list)
+        printf 'play\tShuffle and loop ~/Music (or given paths)\n'
+        printf 'open\tOpen given files or URLs\n'
+        ;;
+    play)
+        [ "$#" -gt 0 ] || set -- "$HOME/Music"
+        exec vlc --random --loop "$@"
+        ;;
+    open) exec vlc "$@" ;;
+    *) echo "Unknown vlc action: $action" >&2; exit 2 ;;
+esac

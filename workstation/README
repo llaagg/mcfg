@@ -1,4 +1,4 @@
-Workstation profile — keyboard defaults plus optional FVWM startup integration.
+Workstation profile — optional FVWM startup integration.
 
 The home/ tree is installed into the target user's home directory. The profile
 adds a separate FVWM function and a role-based application launcher; it does not

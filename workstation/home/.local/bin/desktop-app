@@ -1,0 +1,56 @@
+#!/bin/sh
+# Launch the selected application for a logical role.
+# Usage: desktop-app ROLE [ACTION] [ARG ...]
+#        desktop-app --list
+# APP-wrapper --list must print one "ACTION<TAB>DESCRIPTION" line per action.
+# If ACTION (lowercase word) is given and APP-wrapper exists in PATH, it is run
+# as: APP-wrapper ACTION [ARG ...]. Otherwise all arguments go to APP.
+set -eu
+
+config=${XDG_CONFIG_HOME:-"$HOME/.config"}/devuan-machine-config/apps.conf
+
+list_commands() {
+    [ -r "$config" ] || { echo "Cannot read $config" >&2; exit 1; }
+    grep -E '^[a-z0-9-]+=[A-Za-z0-9._+-]+$' "$config" | while IFS='=' read -r r a; do
+        printf '%s (%s)\n' "$r" "$a"
+        if command -v "$a-wrapper" >/dev/null 2>&1; then
+            "$a-wrapper" --list | while IFS= read -r line; do
+                printf '  %s %s\n' "$r" "$line"
+            done
+        fi
+    done
+}
+
+role=${1:-}
+[ -n "$role" ] || {
+    echo "Usage: desktop-app ROLE [ACTION] [ARG ...] | --list" >&2
+    exit 2
+}
+[ "$role" != --list ] || { list_commands; exit 0; }
+shift
+case "$role" in
+    *[!a-z0-9-]*|"") echo "Invalid application role: $role" >&2; exit 2 ;;
+esac
+
+app=
+if [ -r "$config" ]; then
+    app=$(sed -n "s/^${role}=//p" "$config" | sed -n '1p')
+fi
+[ -n "$app" ] || {
+    echo "No application configured for role '$role' in $config" >&2
+    exit 127
+}
+case "$app" in
+    *[!A-Za-z0-9._+-]*|"") echo "Invalid executable name for '$role': $app" >&2; exit 2 ;;
+esac
+if ! command -v "$app" >/dev/null 2>&1; then
+    echo "Configured application '$app' for '$role' is not installed or not in PATH" >&2
+    exit 127
+fi
+case "${1:-}" in
+    [a-z]*) case "$1" in *[!a-z-]*) ;; *)
+        if command -v "$app-wrapper" >/dev/null 2>&1; then
+            exec "$app-wrapper" "$@"
+        fi ;; esac ;;
+esac
+exec "$app" "$@"

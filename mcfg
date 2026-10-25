@@ -4,7 +4,8 @@
 set -eu
 
 ROOT=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
-PROFILES="$ROOT/profiles"
+PROFILES="$ROOT"
+export MCFG_ROOT="$ROOT"
 STATE_DIR="${MCFG_STATE_DIR:-/var/backups/devuan-machine-config}"
 STATE_FILE="$STATE_DIR/last-backup"
 
@@ -86,9 +87,11 @@ preview() {
     [ ! -f "$PROFILES/$profile/README" ] || cat "$PROFILES/$profile/README"
     echo
     echo "System files to install (relative paths):"
+    [ ! -f "$ROOT/keyboard" ] || echo "etc/default/keyboard (from top-level keyboard)"
     find "$PROFILES/$profile/rootfs" -type f -print 2>/dev/null | sed "s#^$PROFILES/$profile/rootfs/##" || true
     echo
     echo "User files to install (relative paths):"
+    [ ! -f "$ROOT/apps.conf" ] || echo ".config/devuan-machine-config/apps.conf (from top-level apps.conf)"
     find "$PROFILES/$profile/home" -type f -print 2>/dev/null | sed "s#^$PROFILES/$profile/home/##" || true
     echo
     echo "Scripts to run:"
@@ -151,6 +154,26 @@ apply_profile() {
 
     install_tree "$PROFILES/$profile/rootfs" "" "$backup_root"
 
+    if [ -f "$ROOT/keyboard" ]; then
+        backup_file /etc/default/keyboard "$backup_root"
+        install -m 0644 "$ROOT/keyboard" /etc/default/keyboard
+        echo "Installed /etc/default/keyboard"
+    fi
+
+    if [ -f "$ROOT/apps.conf" ]; then
+        apps_home=$(resolve_target_home)
+        [ -n "$apps_home" ] && [ -d "$apps_home" ] || {
+            echo "Could not resolve target user's home directory." >&2
+            exit 1
+        }
+        apps_dest="$apps_home/.config/devuan-machine-config/apps.conf"
+        backup_file "$apps_dest" "$backup_root"
+        mkdir -p "$(dirname "$apps_dest")"
+        install -m 0644 "$ROOT/apps.conf" "$apps_dest"
+        chown "${SUDO_USER:-root}" "$(dirname "$apps_dest")" "$apps_dest" 2>/dev/null || true
+        echo "Installed $apps_dest"
+    fi
+
     home_root="$PROFILES/$profile/home"
     if [ -d "$home_root" ]; then
         target_home=$(resolve_target_home)
@@ -161,8 +184,9 @@ apply_profile() {
         install_tree "$home_root" "$target_home" "$backup_root"
         target_user=${SUDO_USER:-root}
         for installed_file in \
-            "$target_home/.config/devuan-machine-config/apps.conf" \
             "$target_home/.local/bin/desktop-app" \
+            "$target_home/.local/bin/vlc-wrapper" \
+            "$target_home/.local/bin/rclone-wrapper" \
             "$target_home/.fvwm/functions/desktop-profile-startup"; do
             [ ! -e "$installed_file" ] || chown "$target_user" "$installed_file" 2>/dev/null || true
         done

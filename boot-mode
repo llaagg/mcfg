@@ -1,0 +1,4 @@
+# How the hardware clock is stored. Applied by hwclock.apply.
+#   standalone  Linux only: RTC holds UTC
+#   dual-boot   Linux + Windows: RTC holds local time, as Windows expects
+dual-boot

@@ -1,0 +1,14 @@
+#!/bin/sh
+# Set the RTC mode from the boot-mode file next to mcfg so the system clock stays absolute.
+set -eu
+
+mode=$(grep -v '^[[:space:]]*#' "$MCFG_ROOT/boot-mode" | sed -n '1p' | tr -d '[:space:]')
+
+case "$mode" in
+    standalone) flag=--utc ;;
+    dual-boot) flag=--localtime ;;
+    *) echo "Invalid boot-mode '$mode' (use standalone or dual-boot)" >&2; exit 2 ;;
+esac
+
+hwclock --systohc "$flag"
+echo "Hardware clock set for $mode ($flag)"

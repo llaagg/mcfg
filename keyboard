@@ -1,4 +1,4 @@
-# Debian/Devuan keyboard defaults. Adjust layout to your preference.
+# Keyboard settings installed to /etc/default/keyboard by every profile.
 XKBMODEL="pc105"
 XKBLAYOUT="pl"
 XKBVARIANT=""

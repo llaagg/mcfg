@@ -1,0 +1,36 @@
+#!/bin/sh
+# Actions for the cloud-storage role when it is rclone: desktop-app cloud-storage ACTION
+# Usage: rclone-wrapper {mount|unmount|restart|status|--list}
+set -eu
+
+remote=${RCLONE_ONEDRIVE_REMOTE:-OneDrive}
+dir="$HOME/OneDrive"
+
+mounted() { mountpoint -q "$dir"; }
+
+do_mount() {
+    mounted && { echo "$dir already mounted"; return 0; }
+    mkdir -p "$dir"
+    rclone mount "$remote:" "$dir" --vfs-cache-mode full --daemon
+}
+
+do_unmount() {
+    mounted || return 0
+    fusermount -u "$dir" 2>/dev/null || fusermount3 -u "$dir"
+}
+
+case "${1:-}" in
+    --list)
+        printf 'mount\tMount OneDrive at ~/OneDrive\n'
+        printf 'unmount\tUnmount ~/OneDrive\n'
+        printf 'restart\tUnmount and mount again\n'
+        printf 'status\tShow whether ~/OneDrive is mounted\n'
+        ;;
+    mount) do_mount ;;
+    unmount) do_unmount ;;
+    restart) do_unmount; do_mount ;;
+    status)
+        if mounted; then echo "mounted: $dir"; else echo "not mounted"; exit 1; fi
+        ;;
+    *) echo "Usage: rclone-wrapper {mount|unmount|restart|status}" >&2; exit 2 ;;
+esac

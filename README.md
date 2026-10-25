@@ -35,8 +35,8 @@ sudo ./mcfg rollback
 
 ## Design
 
-- Profiles are plain files under `profiles/<name>/rootfs/`, mapped to `/`.
-- Optional root scripts use `profiles/<name>/scripts/*.apply`.
+- Profiles are plain files under `<name>/rootfs/`, mapped to `/`.
+- Optional root scripts use `<name>/scripts/*.apply`.
 - GUI should be an optional Tcl/Tk front end to this CLI.
 
 ## User-level desktop profiles and FVWM

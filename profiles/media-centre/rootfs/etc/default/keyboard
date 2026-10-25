@@ -1,6 +1,0 @@
-# Media-centre keyboard defaults.
-XKBMODEL="pc105"
-XKBLAYOUT="us"
-XKBVARIANT=""
-XKBOPTIONS=""
-BACKSPACE="guess"

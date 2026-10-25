@@ -1,7 +1,11 @@
-Laptop profile — Polish keyboard defaults plus the optional role-based desktop
+Laptop profile — optional role-based desktop
 application launcher. It does not alter power-management services automatically.
 
 If using FVWM, you may also copy the workstation profile's FVWM function and add
   + I Function DesktopProfileStartup
 inside your existing StartFunction. The laptop profile itself does not overwrite
 any existing FVWM configuration.
+
+Clock: edit boot-mode next to mcfg to "standalone" (Linux only, RTC in UTC) or "dual-boot"
+(Linux + Windows, RTC in local time), then run `sudo ./mcfg apply laptop`.
+scripts/hwclock.apply writes the hardware clock; it is not rolled back by `mcfg rollback`.
