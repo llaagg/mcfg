@@ -1,0 +1,12 @@
+# Optional startup function for the Devuan Machine Configurator.
+# Add: + I Function DesktopProfileStartup
+# to your existing FVWM StartFunction. This file does not replace StartFunction.
+DestroyFunc DesktopProfileStartup
+AddToFunc DesktopProfileStartup
++ I Test (Init) Exec $[HOME]/.local/bin/desktop-app keyboard-indicator
++ I Test (Init) Exec $[HOME]/.local/bin/desktop-app network-tray
++ I Test (Init) Exec $[HOME]/.local/bin/desktop-app power-manager
++ I Test (Init) Exec $[HOME]/.local/bin/desktop-app screensaver
++ I Test (Init) Exec $[HOME]/.local/bin/desktop-app notifications
++ I Test (Init) Exec $[HOME]/.local/bin/desktop-app audio-tray
++ I Test (Init) Exec $[HOME]/.local/bin/desktop-app bluetooth-tray

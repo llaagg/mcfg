@@ -1,0 +1,236 @@
+#!/bin/sh
+# Devuan Machine Configurator: one-shot POSIX shell CLI
+# Usage: ./mcfg {detect|list|preview PROFILE|apply PROFILE|rollback}
+set -eu
+
+ROOT=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
+PROFILES="$ROOT/profiles"
+STATE_DIR="${MCFG_STATE_DIR:-/var/backups/devuan-machine-config}"
+STATE_FILE="$STATE_DIR/last-backup"
+
+usage() {
+    cat <<'EOF'
+Devuan Machine Configurator
+
+Commands:
+  detect              Show basic hardware and session information
+  list                List available profiles
+  preview PROFILE     Show files that would be applied
+  apply PROFILE       Back up and apply a profile (requires root)
+  rollback            Restore files from the last apply backup (requires root)
+
+Environment:
+  MCFG_STATE_DIR Override backup location (default /var/backups/devuan-machine-config)
+EOF
+}
+
+need_root() {
+    if [ "$(id -u)" -ne 0 ]; then
+        echo "Please run this command with sudo." >&2
+        exit 1
+    fi
+}
+
+detect() {
+    echo "System:"
+    [ ! -r /etc/os-release ] || . /etc/os-release
+    printf '  OS: %s\n' "${PRETTY_NAME:-unknown}"
+    printf '  Kernel: %s\n' "$(uname -sr)"
+    printf '  Architecture: %s\n' "$(uname -m)"
+    printf '  Init: '
+    if command -v sysv-rc-conf >/dev/null 2>&1; then
+        echo "SysV (sysv-rc-conf available)"
+    elif [ -x /etc/init.d/cron ] && [ ! -d /run/systemd/system ]; then
+        echo "probably SysV/OpenRC (inspect /sbin/init)"
+    else
+        ls -l /sbin/init 2>/dev/null || echo "unknown"
+    fi
+    printf '  Desktop session: %s\n' "${XDG_CURRENT_DESKTOP:-unknown}"
+    printf '  Session type: %s\n' "${XDG_SESSION_TYPE:-unknown}"
+    echo
+    echo "Hardware summary:"
+    command -v lscpu >/dev/null 2>&1 && lscpu | sed -n '1,8p' || true
+    command -v lspci >/dev/null 2>&1 && lspci | sed -n '1,20p' || true
+    command -v lsusb >/dev/null 2>&1 && lsusb || true
+}
+
+list_profiles() {
+    found=0
+    for p in "$PROFILES"/*; do
+        [ -d "$p" ] || continue
+        found=1
+        printf '%s' "${p##*/}"
+        [ ! -f "$p/README" ] || printf ' — %s' "$(sed -n '1p' "$p/README")"
+        printf '\n'
+    done
+    [ "$found" -eq 1 ] || echo "No profiles found."
+}
+
+validate_profile() {
+    case "$1" in
+        ""|.*|*/*|*[!A-Za-z0-9._-]*)
+            echo "Invalid profile name: $1" >&2
+            exit 2
+            ;;
+    esac
+    [ -d "$PROFILES/$1" ] || {
+        echo "Unknown profile: $1" >&2
+        exit 2
+    }
+}
+
+preview() {
+    profile=$1
+    validate_profile "$profile"
+    echo "Profile: $profile"
+    [ ! -f "$PROFILES/$profile/README" ] || cat "$PROFILES/$profile/README"
+    echo
+    echo "System files to install (relative paths):"
+    find "$PROFILES/$profile/rootfs" -type f -print 2>/dev/null | sed "s#^$PROFILES/$profile/rootfs/##" || true
+    echo
+    echo "User files to install (relative paths):"
+    find "$PROFILES/$profile/home" -type f -print 2>/dev/null | sed "s#^$PROFILES/$profile/home/##" || true
+    echo
+    echo "Scripts to run:"
+    find "$PROFILES/$profile/scripts" -type f -print 2>/dev/null | sed "s#^$PROFILES/$profile/scripts/##" || true
+    echo
+    echo "Preview only: no changes made."
+}
+
+backup_file() {
+    dest=$1
+    backup_root=$2
+    rel=${dest#/}
+    backup_path="$backup_root/files/$rel"
+    if [ -e "$dest" ] || [ -L "$dest" ]; then
+        mkdir -p "$(dirname "$backup_path")"
+        cp -a "$dest" "$backup_path"
+        printf 'present\n' >> "$backup_root/manifest"
+    else
+        printf 'absent\n' >> "$backup_root/manifest"
+    fi
+    printf '%s\n' "$dest" >> "$backup_root/paths"
+}
+
+install_tree() {
+    source_root=$1
+    destination_root=$2
+    backup_root=$3
+    [ -d "$source_root" ] || return 0
+    find "$source_root" -type f -print | while IFS= read -r source; do
+        rel=${source#"$source_root"/}
+        dest="$destination_root/$rel"
+        backup_file "$dest" "$backup_root"
+        mkdir -p "$(dirname "$dest")"
+        mode=0644
+        [ ! -x "$source" ] || mode=0755
+        install -m "$mode" "$source" "$dest"
+        printf 'Installed %s\n' "$dest"
+    done
+}
+
+resolve_target_home() {
+    if [ -n "${SUDO_USER:-}" ] && [ "$SUDO_USER" != root ]; then
+        getent passwd "$SUDO_USER" | cut -d: -f6
+    else
+        printf '%s\n' "${HOME:-/root}"
+    fi
+}
+
+apply_profile() {
+    profile=$1
+    validate_profile "$profile"
+    need_root
+
+    stamp=$(date '+%Y%m%d-%H%M%S')
+    mkdir -p "$STATE_DIR"
+    backup_root="$STATE_DIR/$stamp"
+    mkdir -p "$backup_root"
+    : > "$backup_root/manifest"
+    : > "$backup_root/paths"
+
+    install_tree "$PROFILES/$profile/rootfs" "" "$backup_root"
+
+    home_root="$PROFILES/$profile/home"
+    if [ -d "$home_root" ]; then
+        target_home=$(resolve_target_home)
+        [ -n "$target_home" ] && [ -d "$target_home" ] || {
+            echo "Could not resolve target user's home directory." >&2
+            exit 1
+        }
+        install_tree "$home_root" "$target_home" "$backup_root"
+        target_user=${SUDO_USER:-root}
+        for installed_file in \
+            "$target_home/.config/devuan-machine-config/apps.conf" \
+            "$target_home/.local/bin/desktop-app" \
+            "$target_home/.fvwm/functions/desktop-profile-startup"; do
+            [ ! -e "$installed_file" ] || chown "$target_user" "$installed_file" 2>/dev/null || true
+        done
+    fi
+
+    # Scripts are deliberately opt-in: profile scripts must be executable and
+    # named *.apply. Review them before running; they execute as root.
+    scripts="$PROFILES/$profile/scripts"
+    if [ -d "$scripts" ]; then
+        for script in "$scripts"/*.apply; do
+            [ -f "$script" ] || continue
+            echo "Running reviewed profile script: ${script##*/}"
+            "$script"
+        done
+    fi
+
+    printf '%s\n' "$backup_root" > "$STATE_FILE"
+    echo
+    echo "Applied profile '$profile'. Backup: $backup_root"
+    echo "Review output and reboot/log out if a setting requires it."
+}
+
+rollback() {
+    need_root
+    [ -r "$STATE_FILE" ] || {
+        echo "No previous backup found at $STATE_FILE" >&2
+        exit 1
+    }
+    backup_root=$(cat "$STATE_FILE")
+    [ -d "$backup_root" ] || {
+        echo "Backup directory missing: $backup_root" >&2
+        exit 1
+    }
+
+    # Read paths and matching status entries in lockstep.
+    exec 3< "$backup_root/manifest"
+    while IFS= read -r dest; do
+        IFS= read -r status <&3 || status=absent
+        rel=${dest#/}
+        backup_path="$backup_root/files/$rel"
+        if [ "$status" = present ] && { [ -e "$backup_path" ] || [ -L "$backup_path" ]; }; then
+            rm -f "$dest"
+            mkdir -p "$(dirname "$dest")"
+            cp -a "$backup_path" "$dest"
+            echo "Restored $dest"
+        else
+            rm -f "$dest"
+            echo "Removed $dest (did not exist before apply)"
+        fi
+    done < "$backup_root/paths"
+    exec 3<&-
+    rm -f "$STATE_FILE"
+    echo "Rollback complete."
+}
+
+cmd=${1:-}
+case "$cmd" in
+    detect) detect ;;
+    list) list_profiles ;;
+    preview)
+        [ "$#" -eq 2 ] || { usage; exit 2; }
+        preview "$2"
+        ;;
+    apply)
+        [ "$#" -eq 2 ] || { usage; exit 2; }
+        apply_profile "$2"
+        ;;
+    rollback) rollback ;;
+    -h|--help|"") usage ;;
+    *) usage; exit 2 ;;
+esac

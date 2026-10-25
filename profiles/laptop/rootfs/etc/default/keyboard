@@ -1,0 +1,6 @@
+# Laptop keyboard defaults.
+XKBMODEL="pc105"
+XKBLAYOUT="pl"
+XKBVARIANT=""
+XKBOPTIONS=""
+BACKSPACE="guess"

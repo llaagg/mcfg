@@ -1,0 +1,12 @@
+Workstation profile — keyboard defaults plus optional FVWM startup integration.
+
+The home/ tree is installed into the target user's home directory. The profile
+adds a separate FVWM function and a role-based application launcher; it does not
+replace the user's main FVWM configuration. After applying, add this line to
+your existing StartFunction:
+
+  + I Function DesktopProfileStartup
+
+The launcher reads ~/.config/devuan-machine-config/apps.conf. It only launches
+one executable per role (no shell evaluation or arbitrary command-line parsing).
+Review the mappings and installed applications before using the profile.

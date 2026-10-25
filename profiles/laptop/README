@@ -1,0 +1,7 @@
+Laptop profile — Polish keyboard defaults plus the optional role-based desktop
+application launcher. It does not alter power-management services automatically.
+
+If using FVWM, you may also copy the workstation profile's FVWM function and add
+  + I Function DesktopProfileStartup
+inside your existing StartFunction. The laptop profile itself does not overwrite
+any existing FVWM configuration.
