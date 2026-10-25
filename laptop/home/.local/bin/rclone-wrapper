@@ -1,6 +1,6 @@
 #!/bin/sh
 # Actions for the cloud-storage role when it is rclone: desktop-app cloud-storage ACTION
-# Usage: rclone-wrapper {mount|unmount|restart|status|--list}
+# Usage: rclone-wrapper {on|off|restart|status|--list}
 set -eu
 
 remote=${RCLONE_ONEDRIVE_REMOTE:-OneDrive}
@@ -11,7 +11,12 @@ mounted() { mountpoint -q "$dir"; }
 do_mount() {
     mounted && { echo "$dir already mounted"; return 0; }
     mkdir -p "$dir"
-    rclone mount "$remote:" "$dir" --vfs-cache-mode full --daemon
+    rclone mount "$remote:" "$dir" \
+        --vfs-cache-mode full \
+        --vfs-cache-max-size 100G \
+        --max-read-ahead 200M \
+        --allow-other \
+        --daemon
 }
 
 do_unmount() {
@@ -21,16 +26,16 @@ do_unmount() {
 
 case "${1:-}" in
     --list)
-        printf 'mount\tMount OneDrive at ~/OneDrive\n'
-        printf 'unmount\tUnmount ~/OneDrive\n'
+        printf 'on\tMount OneDrive at ~/OneDrive\n'
+        printf 'off\tUnmount ~/OneDrive\n'
         printf 'restart\tUnmount and mount again\n'
         printf 'status\tShow whether ~/OneDrive is mounted\n'
         ;;
-    mount) do_mount ;;
-    unmount) do_unmount ;;
+    on) do_mount ;;
+    off) do_unmount ;;
     restart) do_unmount; do_mount ;;
     status)
         if mounted; then echo "mounted: $dir"; else echo "not mounted"; exit 1; fi
         ;;
-    *) echo "Usage: rclone-wrapper {mount|unmount|restart|status}" >&2; exit 2 ;;
+    *) echo "Usage: rclone-wrapper {on|off|restart|status}" >&2; exit 2 ;;
 esac

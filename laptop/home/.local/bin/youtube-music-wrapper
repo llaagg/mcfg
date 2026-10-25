@@ -1,0 +1,41 @@
+#!/bin/sh
+# Actions for the music-streaming role when it is youtube-music: desktop-app music-streaming ACTION
+# Usage: youtube-music-wrapper {open|play|pause|toggle|stop|next|previous|--list}
+# Controls the running Brave app over MPRIS (dbus-send); no extra packages needed.
+set -eu
+
+mpris_name() {
+    dbus-send --session --print-reply --dest=org.freedesktop.DBus \
+        /org/freedesktop/DBus org.freedesktop.DBus.ListNames |
+        sed -n 's/.*"\(org\.mpris\.MediaPlayer2\.\(chromium\|brave\)[^"]*\)".*/\1/p' | sed -n '1p'
+}
+
+player() {
+    method=$1
+    shift
+    name=$(mpris_name)
+    [ -n "$name" ] || { echo "YouTube Music is not running (try: open)" >&2; exit 1; }
+    dbus-send --session --type=method_call --dest="$name" \
+        /org/mpris/MediaPlayer2 "org.mpris.MediaPlayer2.Player.$method" "$@"
+}
+
+case "${1:-}" in
+    --list)
+        printf 'open\tLaunch YouTube Music\n'
+        printf 'play\tResume playback\n'
+        printf 'pause\tPause playback\n'
+        printf 'toggle\tToggle play/pause\n'
+        printf 'stop\tPause and rewind to the start of the track\n'
+        printf 'next\tNext track\n'
+        printf 'previous\tPrevious track\n'
+        ;;
+    open) shift; exec youtube-music "$@" ;;
+    play) player Play ;;
+    pause) player Pause ;;
+    toggle) player PlayPause ;;
+    # MPRIS Stop ends the session and Brave cannot resume it, so pause and rewind.
+    stop) player Pause; player Seek int64:-86400000000 ;;
+    next) player Next ;;
+    previous) player Previous ;;
+    *) echo "Usage: youtube-music-wrapper {open|play|pause|toggle|stop|next|previous}" >&2; exit 2 ;;
+esac

@@ -185,8 +185,11 @@ apply_profile() {
         target_user=${SUDO_USER:-root}
         for installed_file in \
             "$target_home/.local/bin/desktop-app" \
+            "$target_home/.local/share/bash-completion/completions/desktop-app" \
             "$target_home/.local/bin/vlc-wrapper" \
             "$target_home/.local/bin/rclone-wrapper" \
+            "$target_home/.local/bin/youtube-music" \
+            "$target_home/.local/bin/youtube-music-wrapper" \
             "$target_home/.fvwm/functions/desktop-profile-startup"; do
             [ ! -e "$installed_file" ] || chown "$target_user" "$installed_file" 2>/dev/null || true
         done
