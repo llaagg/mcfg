@@ -1,0 +1,6 @@
+# Optional FVWM media-key bindings for the music-streaming role.
+# Add near the top of your FVWM config: Read $[HOME]/.fvwm/functions/laptop-media-keys
+Key XF86AudioPlay  A A Exec exec $[HOME]/.local/bin/desktop-app music-streaming toggle
+Key XF86AudioStop  A A Exec exec $[HOME]/.local/bin/desktop-app music-streaming stop
+Key XF86AudioNext  A A Exec exec $[HOME]/.local/bin/desktop-app music-streaming next
+Key XF86AudioPrev  A A Exec exec $[HOME]/.local/bin/desktop-app music-streaming previous

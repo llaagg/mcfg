@@ -189,6 +189,7 @@ apply_profile() {
             "$target_home/.local/bin/vlc-wrapper" \
             "$target_home/.local/bin/rclone-wrapper" \
             "$target_home/.local/bin/youtube-music" \
+            "$target_home/.local/bin/xfce-media-keys" \
             "$target_home/.local/bin/youtube-music-wrapper" \
             "$target_home/.fvwm/functions/desktop-profile-startup"; do
             [ ! -e "$installed_file" ] || chown "$target_user" "$installed_file" 2>/dev/null || true

@@ -1,0 +1,13 @@
+#!/bin/sh
+# Bind the laptop media keys to the music-streaming role in XFCE (run inside the XFCE session).
+set -eu
+
+bind() {
+    xfconf-query -c xfce4-keyboard-shortcuts -p "/commands/custom/$1" \
+        --create -t string -s "$HOME/.local/bin/desktop-app music-streaming $2"
+}
+
+bind XF86AudioPlay toggle
+bind XF86AudioNext next
+bind XF86AudioPrev previous
+bind XF86AudioStop stop
